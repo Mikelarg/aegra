@@ -93,7 +93,7 @@ app.add_middleware(
 )
 
 # Add middleware to handle double-encoded JSON from frontend
-app.add_middleware(DoubleEncodedJSONMiddleware)
+# app.add_middleware(DoubleEncodedJSONMiddleware)
 
 # Add authentication middleware (must be added after CORS)
 app.add_middleware(
