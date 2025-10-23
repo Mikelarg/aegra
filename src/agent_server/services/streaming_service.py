@@ -239,6 +239,9 @@ class StreamingService:
         # Stream live events
         if broker:
             async for event_id, raw_event in broker.aiter():
+                if event_id and isinstance(event_id, str) and event_id.startswith("heartbeat"):
+                    yield raw_event
+                    continue
                 # Skip duplicates that were already replayed
                 current_sequence = self._extract_event_sequence(event_id)
                 if current_sequence <= last_sent_sequence:

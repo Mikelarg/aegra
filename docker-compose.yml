@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_2:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d aegra"]
       interval: 5s
@@ -57,5 +57,5 @@ services:
       - redis
 
 volumes:
-  postgres_data:
+  postgres_data_2:
   redis_data:

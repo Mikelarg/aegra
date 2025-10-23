@@ -68,8 +68,8 @@ class RunCreate(BaseModel):
                 raise ValueError(
                     "Cannot specify both 'input' and 'command' - they are mutually exclusive"
                 )
-        if self.input is None and self.command is None:
-            raise ValueError("Must specify either 'input' or 'command'")
+        # if self.input is None and self.command is None:
+        #     raise ValueError("Must specify either 'input' or 'command'")
         return self
 
 
