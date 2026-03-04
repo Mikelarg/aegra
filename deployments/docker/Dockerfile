@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
-WORKDIR /app
+WORKDIR /aegra-api
 
 # Create non-root user for runtime
 RUN addgroup --system app && adduser --system --ingroup app app
@@ -61,8 +61,6 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # Copy runtime assets required by the app and alembic
 COPY libs/aegra-api/alembic.ini ./alembic.ini
 COPY libs/aegra-api/alembic/ ./alembic/
-COPY aegra.json ./aegra.json
-COPY examples/ ./examples/
 
 EXPOSE 8000
 
@@ -70,4 +68,4 @@ EXPOSE 8000
 USER app
 
 # Default command - can be overridden by docker-compose
-CMD ["uvicorn", "aegra_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+#CMD ["uvicorn", "aegra_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

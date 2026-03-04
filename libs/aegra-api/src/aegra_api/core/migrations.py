@@ -29,6 +29,12 @@ def find_alembic_ini() -> Path:
     Raises:
         FileNotFoundError: If alembic.ini cannot be found
     """
+    # Поменял порядок загрузки alembic
+    package_dir = Path(__file__).resolve().parent.parent  # aegra_api/
+    package_ini = package_dir / "alembic.ini"
+    if package_ini.exists():
+        return package_ini
+
     # 1. CWD (works in repo dev and Docker)
     cwd_ini = Path("alembic.ini")
     if cwd_ini.exists():
@@ -36,10 +42,7 @@ def find_alembic_ini() -> Path:
 
     # 2. Package bundled (pip install aegra-api)
     # In installed package: site-packages/aegra_api/alembic.ini
-    package_dir = Path(__file__).resolve().parent.parent  # aegra_api/
-    package_ini = package_dir / "alembic.ini"
-    if package_ini.exists():
-        return package_ini
+
 
     # 3. Development layout (src layout: libs/aegra-api/src/aegra_api/ → libs/aegra-api/)
     dev_root = package_dir.parent.parent  # Up from src/aegra_api/ to libs/aegra-api/

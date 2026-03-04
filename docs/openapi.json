@@ -1572,6 +1572,49 @@
         }
       }
     },
+    "/threads/count": {
+      "post": {
+        "tags": [
+          "Threads"
+        ],
+        "summary": "Count Threads",
+        "description": "Count threads matching the specified criteria.",
+        "operationId": "count_threads_threads_count_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThreadCountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "title": "Response Count Threads Threads Count Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/threads/{thread_id}/runs": {
       "post": {
         "tags": [
@@ -4141,6 +4184,38 @@
         ],
         "title": "ThreadCheckpointPostRequest",
         "description": "Request model for fetching thread checkpoint"
+      },
+      "ThreadCountRequest": {
+        "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Thread metadata to filter on."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Thread status to filter on (idle, busy, interrupted, error)."
+          }
+        },
+        "type": "object",
+        "title": "ThreadCountRequest",
+        "description": "Payload for counting threads (POST /threads/count)."
       },
       "ThreadCreate": {
         "properties": {

@@ -82,6 +82,23 @@ class ThreadSearchRequest(BaseModel):
         return v
 
 
+class ThreadCountRequest(BaseModel):
+    """Payload for counting threads (POST /threads/count)."""
+
+    metadata: dict[str, Any] | None = Field(None, description="Thread metadata to filter on.")
+    status: str | None = Field(
+        None,
+        description="Thread status to filter on (idle, busy, interrupted, error).",
+    )
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return validate_thread_status(v)
+
+
 class ThreadSearchResponse(BaseModel):
     """Response model for thread search"""
 
