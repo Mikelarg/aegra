@@ -402,28 +402,31 @@ class LangGraphService:
             ValueError: If the file or export is not found.
         """
         raw_path = graph_info["file_path"]
-        file_path = Path(raw_path)
+        if "/" in raw_path:
+            file_path = Path(raw_path)
 
-        # Resolve relative paths from config file directory
-        if not file_path.is_absolute():
-            file_path = (self.config_path.parent / file_path).resolve()
+            # Resolve relative paths from config file directory
+            if not file_path.is_absolute():
+                file_path = (self.config_path.parent / file_path).resolve()
 
-        if not file_path.exists():
-            raise ValueError(f"Graph file not found: {file_path}")
+            if not file_path.exists():
+                raise ValueError(f"Graph file not found: {file_path}")
 
-        # Dynamic import of graph module
-        spec = importlib.util.spec_from_file_location(f"graphs.{graph_id}", str(file_path.resolve()))
-        if spec is None or spec.loader is None:
-            raise ValueError(f"Failed to load graph module: {file_path}")
+            # Dynamic import of graph module
+            spec = importlib.util.spec_from_file_location(f"graphs.{graph_id}", str(file_path.resolve()))
+            if spec is None or spec.loader is None:
+                raise ValueError(f"Failed to load graph module: {file_path}")
 
-        module = importlib.util.module_from_spec(spec)
-        module_name = spec.name
-        sys.modules[module_name] = module
-        try:
-            spec.loader.exec_module(module)
-        except Exception:
-            sys.modules.pop(module_name, None)
-            raise
+            module = importlib.util.module_from_spec(spec)
+            module_name = spec.name
+            sys.modules[module_name] = module
+            try:
+                spec.loader.exec_module(module)
+            except Exception:
+                sys.modules.pop(module_name, None)
+                raise
+        else:
+            module = importlib.import_module(raw_path)
 
         # Get the exported graph
         export_name = graph_info["export_name"]

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aegra_api.api.runs import active_runs
@@ -25,6 +25,7 @@ from aegra_api.models import (
     ThreadCreate,
     ThreadHistoryRequest,
     ThreadList,
+    ThreadCountRequest,
     ThreadSearchRequest,
     ThreadState,
     ThreadStateUpdate,
@@ -845,3 +846,33 @@ async def search_threads(
     threads_models = [_serialize_thread(t) for t in rows]
 
     return threads_models
+
+
+@router.post("/threads/count", response_model=int)
+async def count_threads(
+    request: ThreadCountRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> int:
+    """Count threads matching the specified criteria."""
+    # Authorization check (search action)
+    ctx = build_auth_context(user, "threads", "search")
+    value = request.model_dump()
+    filters = await handle_event(ctx, value)
+
+    # Merge handler filters into request metadata (consistent with /threads/search)
+    if filters and "metadata" in filters:
+        handler_meta = filters["metadata"]
+        if isinstance(handler_meta, dict):
+            request.metadata = {**(request.metadata or {}), **handler_meta}
+
+    # Same filters as /threads/search, but returns a COUNT(*)
+    stmt = select(func.count(ThreadORM.thread_id)).where(ThreadORM.user_id == user.identity)
+    if request.status:
+        stmt = stmt.where(ThreadORM.status == request.status)
+    if request.metadata:
+        for key, value in request.metadata.items():
+            stmt = stmt.where(ThreadORM.metadata_json[key].as_string() == str(value))
+
+    count_val = await session.scalar(stmt)
+    return int(count_val or 0)

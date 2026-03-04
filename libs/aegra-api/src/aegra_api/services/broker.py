@@ -11,6 +11,15 @@ from aegra_api.services.base_broker import BaseBrokerManager, BaseRunBroker
 
 logger = structlog.getLogger(__name__)
 
+async def broker_heartbeat(run_id: str, finished: asyncio.Event) -> None:
+    while True:
+        await asyncio.sleep(5)
+        broker = broker_manager.get_broker(run_id)
+        if not broker or finished.is_set():
+            break
+        payload = ":heartbeat\n\n"
+        await broker.put("heartbeat", payload)
+
 
 class RunBroker(BaseRunBroker):
     """Manages event queuing and distribution for a specific run"""
@@ -19,6 +28,8 @@ class RunBroker(BaseRunBroker):
         self.run_id = run_id
         self.queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
         self.finished = asyncio.Event()
+        self._heartbeat_task = asyncio.create_task(
+            broker_heartbeat(run_id, self.finished))
         self._created_at = asyncio.get_event_loop().time()
 
     async def put(self, event_id: str, payload: Any) -> None:
@@ -54,6 +65,8 @@ class RunBroker(BaseRunBroker):
     def mark_finished(self) -> None:
         """Mark this broker as finished"""
         self.finished.set()
+        if self._heartbeat_task is not None and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
         logger.debug(f"Broker for run {self.run_id} marked as finished")
 
     def is_finished(self) -> bool:
