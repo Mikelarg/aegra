@@ -66,7 +66,7 @@ COPY libs/aegra-api/alembic/ ./alembic/
 COPY aegra.json ./aegra.json
 COPY examples/ ./examples/
 
-EXPOSE 2026
+EXPOSE 8000
 
 # Run as non-root
 USER app
