@@ -41,6 +41,7 @@ from aegra_api.models.threads import (
     ThreadStateUpdate,
     ThreadStateUpdateResponse,
     ThreadUpdate,
+    ThreadCountRequest,
 )
 
 __all__ = [
@@ -90,4 +91,5 @@ __all__ = [
     "AuthContext",
     "TokenPayload",
     "ThreadUpdate",
+    "ThreadCountRequest",
 ]

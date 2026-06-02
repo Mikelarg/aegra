@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
-WORKDIR /app
+WORKDIR /aegra-api
 
 # Create non-root user for runtime
 RUN addgroup --system app && adduser --system --ingroup app app
@@ -72,4 +72,4 @@ EXPOSE 2026
 USER app
 
 # Default command - can be overridden by docker-compose
-CMD ["aegra", "serve"]
+# CMD ["aegra", "serve"]
