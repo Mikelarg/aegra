@@ -1,0 +1,166 @@
+---
+title: "Observability"
+description: "Set up tracing with Langfuse, Arize Phoenix, or any OTLP-compatible backend."
+---
+
+Aegra uses OpenTelemetry for all observability. This means you can send traces to multiple backends simultaneously without changing your code — no vendor lock-in.
+
+## Supported backends
+
+Out of the box, Aegra supports:
+
+- **Langfuse** — Production-grade LLM observability
+- **Arize Phoenix** — Local debugging and evaluation
+- **Generic OTLP** — Any compatible backend (Jaeger, Honeycomb, Datadog, etc.)
+
+You can enable one, multiple, or all of these at the same time.
+
+## Configuration
+
+Tracing is configured entirely through environment variables in your `.env` file.
+
+### Enable tracing
+
+Set the `OTEL_TARGETS` variable to a comma-separated list of backends:
+
+```bash
+# Enable Langfuse and Phoenix simultaneously
+OTEL_TARGETS="LANGFUSE,PHOENIX"
+
+# Enable only generic OTLP
+OTEL_TARGETS="GENERIC"
+
+# Disable all tracing (default)
+OTEL_TARGETS=""
+```
+
+For debugging, you can also log traces to the console:
+
+```bash
+OTEL_CONSOLE_EXPORT=true
+```
+
+### Provider configuration
+
+<Tabs>
+  <Tab title="Langfuse">
+    ```bash
+    OTEL_TARGETS="LANGFUSE"
+    LANGFUSE_BASE_URL=https://cloud.langfuse.com
+    LANGFUSE_PUBLIC_KEY=pk-lf-...
+    LANGFUSE_SECRET_KEY=sk-lf-...
+    ```
+  </Tab>
+  <Tab title="Arize Phoenix">
+    Phoenix is great for local trace visualization during development.
+
+    ```bash
+    OTEL_TARGETS="PHOENIX"
+    PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006/v1/traces
+    PHOENIX_API_KEY=  # Optional
+    ```
+  </Tab>
+  <Tab title="Generic OTLP">
+    Connect to Jaeger, Honeycomb, or any OTLP collector.
+
+    ```bash
+    OTEL_TARGETS="GENERIC"
+    OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+    # Optional headers (comma-separated key=value pairs)
+    OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>,X-Custom=Value"
+    ```
+  </Tab>
+</Tabs>
+
+### Fan-out to multiple backends
+
+Send traces to multiple backends at once by listing them in `OTEL_TARGETS`:
+
+```bash
+OTEL_TARGETS="LANGFUSE,PHOENIX"
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006/v1/traces
+```
+
+Each backend receives the same trace data through separate `BatchSpanProcessor` instances.
+
+## How it works
+
+Aegra uses a pure OpenTelemetry approach:
+
+1. **Auto-instrumentation** captures LangGraph steps automatically using `openinference-instrumentation-langchain`
+2. **Singleton provider** is initialized once during application startup
+3. **Fan-out** sends the same trace data to all configured exporters via `BatchSpanProcessor`
+
+This keeps overhead low and maintains compatibility with the entire OpenTelemetry ecosystem.
+
+## Run metadata
+
+Each `POST /threads/{thread_id}/runs` (and `/runs/stream`, `/runs/wait`) request accepts an optional top-level `metadata` field whose key/value pairs are propagated onto the run's root OTEL span. This is the recommended channel for filterable trace attributes that aren't part of the LangGraph payload — tenant id, feature flag, environment tag, sub-agent type, and similar.
+
+```json
+{
+  "assistant_id": "agent",
+  "input": {"question": "..."},
+  "metadata": {
+    "tenant": "acme",
+    "feature_flag": true,
+    "subagent": "matter_legal"
+  }
+}
+```
+
+Each entry reaches the root span as `langfuse.trace.metadata.<key>`, which Langfuse exposes as a queryable trace property (rather than burying it under per-observation metadata). On Phoenix and other OTLP targets the same attribute is set verbatim; native first-class metadata aliasing is a planned follow-up.
+
+The value is also persisted to the runs table (`execution_params.run_metadata` JSONB column) so it survives worker restart and is available for post-hoc analysis.
+
+### Constraints
+
+The request validator rejects payloads that would either be silently dropped downstream or balloon span size past collector limits. A violating payload returns `422` with a single message identifying the offending key:
+
+| Constraint | Limit |
+|------------|-------|
+| Maximum number of keys | 32 |
+| Key character set | `[A-Za-z0-9_-]` (no dots, no whitespace, no non-ASCII) |
+| Key length | 1–64 characters |
+| Value type | `str`, `int`, `float`, or `bool` (no nested dicts, lists, or `null`) |
+| String value length | ≤ 512 characters |
+
+The dot exclusion is deliberate: keys are stored under the `langfuse.trace.metadata.` prefix, and allowing dots would let a caller land bare attributes (e.g. `langfuse.user.id`) next to the system ones.
+
+### System-key collisions
+
+Aegra injects a small number of runtime keys into the same metadata stream so they're filterable alongside user-supplied attributes:
+
+- `run_id`, `thread_id`, `graph_id` — always present
+- `original_request_id` — present on the worker path when an HTTP correlation-id was supplied
+
+If the request `metadata` contains a key already populated by the runtime, the system value wins, the user value is dropped, and a warning is logged from `aegra_api.observability.span_enrichment`. This makes the OTEL view a reliable join key with logs and the runs table; user audit fidelity is preserved by keeping the original payload in `execution_params.run_metadata`.
+
+## Key environment variables
+
+The main variables you'll need:
+
+| Variable | Description |
+|----------|-------------|
+| `OTEL_TARGETS` | Comma-separated list of backends: `LANGFUSE`, `PHOENIX`, `GENERIC` |
+| `OTEL_SERVICE_NAME` | Service name for traces (default: `aegra-backend`) |
+| `OTEL_CONSOLE_EXPORT` | Log traces to console (`true`/`false`) |
+
+Each provider has its own set of variables (endpoints, API keys). See the [environment variables reference](/reference/environment-variables) for the full list including all Langfuse, Phoenix, and generic OTLP variables.
+
+## Prometheus metrics
+
+For infrastructure-level monitoring (request rates, latency, error rates), Aegra supports an optional Prometheus metrics endpoint alongside OpenTelemetry tracing.
+
+```bash
+ENABLE_PROMETHEUS_METRICS=true
+```
+
+This exposes a `/metrics` endpoint with standard HTTP request metrics in Prometheus exposition format. Scrape it with any Prometheus-compatible collector and visualize with Grafana.
+
+The `/metrics` endpoint is **not** protected by Aegra's authentication middleware. This is intentional — Prometheus scrapers typically do not support application-level auth. If you need to restrict access, use network-level controls (firewall rules, internal load-balancer listeners, etc.).
+
+See the [environment variables reference](/reference/environment-variables#prometheus-metrics) for details.
